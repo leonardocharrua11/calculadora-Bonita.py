@@ -1,0 +1,320 @@
+import tkinter as tk
+from tkinter import font
+import math
+
+class Calculator:
+    """
+    Uma classe para criar uma calculadora com interface gráfica moderna usando tkinter.
+    """
+    def __init__(self, master):
+        """
+        Inicializa a calculadora, configura a janela e cria os widgets.
+        """
+        self.master = master
+        master.title("Calculadora Moderna")
+        master.geometry("620x750") # Aumenta o tamanho para acomodar mais botões
+        master.resizable(False, False)
+        master.configure(bg="#1c1c1c")
+
+        self.expression = ""
+        self.is_result = False
+        self.is_2nd_active = False
+        self.angle_mode = "DEG" # Pode ser "DEG" ou "RAD"
+        
+        # Define fontes e cores
+        self.display_font = font.Font(family="Helvetica", size=36)
+        self.button_font = font.Font(family="Helvetica", size=16)
+        self.colors = {
+            "bg": "#1c1c1c",
+            "display_bg": "#1c1c1c",
+            "display_fg": "#ffffff",
+            "button_bg": "#333333",
+            "button_fg": "#ffffff",
+            "operator_bg": "#ff9500",
+            "special_bg": "#a6a6a6",
+            "special_fg": "#000000",
+            "active_bg": "#4a4a4a",
+            "operator_active_bg": "#ffb84d",
+        }
+
+        self.buttons = {} # Dicionário para armazenar os botões
+        self.create_widgets()
+        self.bind_keys()
+
+
+    def create_widgets(self):
+        """
+        Cria e posiciona o visor e os botões na janela.
+        """
+        # --- Visor da Calculadora ---
+        self.display_frame = tk.Frame(self.master, bg=self.colors["display_bg"])
+        self.display_frame.pack(expand=True, fill="both")
+
+        self.total_expression_label = tk.Label(
+            self.display_frame, text=f" {self.angle_mode}", anchor="e", bg=self.colors["display_bg"],
+            fg=self.colors["special_bg"], padx=24, font=self.button_font
+        )
+        self.total_expression_label.pack(expand=True, fill="both")
+
+        self.current_expression_label = tk.Label(
+            self.display_frame, text="0", anchor="e", bg=self.colors["display_bg"],
+            fg=self.colors["display_fg"], padx=24, font=self.display_font
+        )
+        self.current_expression_label.pack(expand=True, fill="both")
+
+        # --- Frame dos Botões ---
+        self.buttons_frame = tk.Frame(self.master, bg=self.colors["bg"])
+        self.buttons_frame.pack(expand=True, fill="both")
+
+        # Grid 6x8
+        for i in range(6): # 6 colunas
+            self.buttons_frame.columnconfigure(i, weight=1)
+        for i in range(8): # 8 linhas
+             self.buttons_frame.rowconfigure(i, weight=1)
+
+        # --- Botões ---
+        # O texto do botão pode ser uma tupla (normal, 2nd_mode)
+        buttons_layout = {
+            ("2nd",): (0, 0), ("DEG", "RAD"): (0, 1), ("sin", "sin⁻¹"): (0, 2), ("cos", "cos⁻¹"): (0, 3), ("tan", "tan⁻¹"): (0, 4), ("%",): (0, 5),
+            ("x²", "x³"): (1, 0), ("sqrt", "³√"): (1, 1), ("^", "ʸ√"): (1, 2), ("log", "log₂"): (1, 3), ("ln", "eˣ"): (1, 4), ("1/x",): (1, 5),
+            ("sinh", "sinh⁻¹"): (2, 0), ("cosh", "cosh⁻¹"): (2, 1), ("tanh", "tanh⁻¹"): (2, 2), ("pi",): (2, 3), ("e",): (2, 4), ("abs",): (2, 5),
+            ("C",): (3, 0), ("(",): (3, 1), (")",): (3, 2), ("fact",): (3, 3), ("⌫",): (3, 4), ("/",): (3, 5),
+            ("7",): (4, 0), ("8",): (4, 1), ("9",): (4, 2), ("*",): (4, 3),
+            ("4",): (5, 0), ("5",): (5, 1), ("6",): (5, 2), ("-",): (5, 3),
+            ("1",): (6, 0), ("2",): (6, 1), ("3",): (6, 2), ("+",): (6, 3),
+            ("0",): (7, 0, 2), (".",): (7, 2), ("=",): (7, 3, 3),
+        }
+
+        # Botões que não mudam com o modo 2nd
+        self.buttons_frame.grid_rowconfigure(4, weight=2)
+        self.buttons_frame.grid_rowconfigure(5, weight=2)
+        self.buttons_frame.grid_rowconfigure(6, weight=2)
+        self.buttons_frame.grid_rowconfigure(7, weight=2)
+
+        for text_tuple, grid_info in buttons_layout.items():
+            text = text_tuple[0]
+            if text.isdigit() or text == ".":
+                bg = self.colors["button_bg"]
+                fg = self.colors["button_fg"]
+                active_bg = self.colors["active_bg"]
+            elif text in "+-*/":
+                bg = self.colors["operator_bg"]
+                fg = self.colors["button_fg"] 
+                active_bg = self.colors["operator_active_bg"]
+            elif text == "=":
+                bg = self.colors["operator_bg"]
+                fg = self.colors["button_fg"]
+                active_bg = self.colors["operator_active_bg"]
+            else:
+                bg = self.colors["special_bg"]
+                fg = self.colors["special_fg"]
+                active_bg = "#c2c2c2"
+
+            self.buttons[text] = tk.Button(
+                self.buttons_frame, text=text, font=self.button_font,
+                bg=bg, fg=fg, borderwidth=0, relief="flat",
+                activebackground=active_bg, activeforeground=fg,
+                command=lambda t=text_tuple: self.on_button_click(t)
+            )
+            
+            if len(grid_info) == 3: # Botão "0" que ocupa 2 colunas
+                self.buttons[text].grid(row=grid_info[0], column=grid_info[1], columnspan=grid_info[2], sticky="nsew", padx=1, pady=1)
+            else:
+                self.buttons[text].grid(row=grid_info[0], column=grid_info[1], sticky="nsew", padx=1, pady=1)
+
+        self.buttons["="].grid(row=4, column=4, rowspan=3, columnspan=2, sticky="nsew", padx=1, pady=1)
+
+    def bind_keys(self):
+        """Associa eventos de teclado a funções da calculadora."""
+        self.master.bind("<Return>", lambda event: self.on_button_click("="))
+        self.master.bind("<KP_Enter>", lambda event: self.on_button_click("=")) # Para teclado numérico
+        self.master.bind("<BackSpace>", lambda event: self.on_button_click("⌫"))
+        self.master.bind("<Escape>", lambda event: self.on_button_click("C"))
+
+        for key in "0123456789.+-*/%()":
+            self.master.bind(key, lambda event, char=key: self.on_button_click((char,)))
+        self.master.bind("<Key-p>", lambda event: self.on_button_click("pi")) # 'p' para pi
+        self.master.bind("<Key-e>", lambda event: self.on_button_click("e")) # 'e' para e
+
+    def on_button_click(self, char_tuple):
+        """
+        Processa o clique de um botão, atualizando a expressão e o visor.
+        """
+        char = char_tuple[1] if self.is_2nd_active and len(char_tuple) > 1 else char_tuple[0]
+
+        if char == "2nd":
+            self.toggle_2nd_mode()
+            return
+        if char in ("DEG", "RAD"):
+            self.toggle_angle_mode()
+            return
+
+        if char == "C":
+            self.clear()
+        elif char == "=":
+            self.calculate()
+        elif char == "⌫":
+            self.backspace()
+        else:
+            self.append_char(char)
+        
+        # Desativa o modo 2nd após usar uma função
+        if self.is_2nd_active and char not in ["2nd", "DEG", "RAD"]:
+            self.toggle_2nd_mode()
+
+    def toggle_2nd_mode(self):
+        self.is_2nd_active = not self.is_2nd_active
+        self.buttons["2nd"].config(relief="sunken" if self.is_2nd_active else "flat")
+        
+        # Mapeamento de botões para suas funções secundárias
+        toggle_map = {
+            "sin": "sin⁻¹", "cos": "cos⁻¹", "tan": "tan⁻¹",
+            "x²": "x³", "sqrt": "³√", "^": "ʸ√",
+            "log": "log₂", "ln": "eˣ",
+            "sinh": "sinh⁻¹", "cosh": "cosh⁻¹", "tanh": "tanh⁻¹",
+        }
+
+        for normal, second in toggle_map.items():
+            if normal in self.buttons:
+                new_text = second if self.is_2nd_active else normal
+                self.buttons[normal].config(text=new_text)
+
+    def toggle_angle_mode(self):
+        if self.angle_mode == "DEG":
+            self.angle_mode = "RAD"
+        else:
+            self.angle_mode = "DEG"
+        
+        self.buttons["DEG"].config(text=self.angle_mode)
+        self.update_total_expression(self.expression) # Atualiza o visor com o novo modo
+
+    def clear(self):
+        """Limpa a expressão e reseta os visores."""
+        self.expression = ""
+        self.is_result = False
+        self.update_display("0")
+        self.update_total_expression("")
+
+    def calculate(self):
+        """Calcula a expressão final."""
+        if not self.expression:
+            return
+        try:
+            # Funções seguras para eval
+            safe_math = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}
+            safe_math['abs'] = abs
+            
+            # Prepara a expressão para avaliação, substituindo operadores e funções
+            expression_to_eval = self.expression.replace('%', '/100')
+            expression_to_eval = expression_to_eval.replace('^', '**') # Potência
+            expression_to_eval = expression_to_eval.replace('³√(', '**(1/3)')
+            expression_to_eval = expression_to_eval.replace('ʸ√', '**(1/') # Requer que o usuário feche o parêntese
+            expression_to_eval = expression_to_eval.replace('eˣ(', 'math.exp(')
+            expression_to_eval = expression_to_eval.replace('log₂(', 'math.log2(')
+            expression_to_eval = expression_to_eval.replace('1/x', '1/')
+
+            # Funções trigonométricas com modo DEG/RAD
+            if self.angle_mode == "DEG":
+                for func in ['sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh']:
+                    expression_to_eval = expression_to_eval.replace(f'{func}(', f'math.{func}(math.radians(')
+                for func in ['sin⁻¹', 'cos⁻¹', 'tan⁻¹']:
+                    expression_to_eval = expression_to_eval.replace(f'{func}(', f'math.degrees(math.a{func.replace("⁻¹","")}((')
+            else: # RAD
+                for func in ['sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh']:
+                    expression_to_eval = expression_to_eval.replace(f'{func}(', f'math.{func}(')
+                for func in ['sin⁻¹', 'cos⁻¹', 'tan⁻¹']:
+                    expression_to_eval = expression_to_eval.replace(f'{func}(', f'math.a{func.replace("⁻¹","")}(')
+            
+            # Funções hiperbólicas inversas
+            for func in ['sinh⁻¹', 'cosh⁻¹', 'tanh⁻¹']:
+                 expression_to_eval = expression_to_eval.replace(f'{func}(', f'math.a{func.replace("⁻¹","")}(')
+
+            # Funções padrão
+            expression_to_eval = expression_to_eval.replace('sqrt(', 'math.sqrt(')
+            expression_to_eval = expression_to_eval.replace('log(', 'math.log10(')
+            expression_to_eval = expression_to_eval.replace('ln(', 'math.log(')
+            expression_to_eval = expression_to_eval.replace('pi', str(math.pi))
+            expression_to_eval = expression_to_eval.replace('e', str(math.e))
+            expression_to_eval = expression_to_eval.replace('fact(', 'math.factorial(')
+            expression_to_eval = expression_to_eval.replace('abs(', 'abs(')
+
+            # Usa eval com um ambiente seguro para funções matemáticas
+            result = str(eval(expression_to_eval, {"__builtins__": {}}, safe_math))
+            if len(result) > 15:
+                result = f"{float(result):.10e}" # Formato científico para números longos
+
+            self.update_display(result)
+            self.update_total_expression(self.expression + "=")
+            self.expression = result
+            self.is_result = True # Marca que o resultado atual é um cálculo
+        except Exception:
+            self.update_display("Erro")
+            self.expression = ""
+            self.is_result = False
+
+    def backspace(self):
+        """Apaga o último caractere da expressão."""
+        if self.is_result:
+            self.clear()
+        else:
+            self.expression = self.expression[:-1]
+            self.update_total_expression(self.expression)
+            if not self.expression:
+                self.update_display("0")
+
+    def append_char(self, char):
+        """Adiciona um caractere à expressão."""
+        if self.is_result:
+            if char in "+-*/%^":
+                self.is_result = False
+            else:
+                self.expression = ""
+                self.is_result = False
+        
+        # Lógica para adicionar caracteres especiais/funções
+        if char in ["sin", "cos", "tan", "sqrt", "log", "ln", "abs", "fact"]:
+            self.expression += char + "("
+        elif char == "pi":
+            self.expression += "pi" # Será substituído por math.pi em calculate
+        elif char == "e":
+            self.expression += "e" # Será substituído por math.e em calculate
+        elif char == "^":
+            self.expression += "^" # Será substituído por ** em calculate
+        elif char == "x²":
+            self.expression += "**2"
+        elif char == "x³":
+            self.expression += "**3"
+        elif char == "¹⁰ˣ":
+            self.expression += "10**"
+        elif char in ["sin⁻¹", "cos⁻¹", "tan⁻¹", "sinh", "cosh", "tanh", "sinh⁻¹", "cosh⁻¹", "tanh⁻¹", "³√", "ʸ√", "log₂", "eˣ"]:
+            self.expression += char + "("
+        elif char == "1/x":
+            self.expression += "1/"
+        elif char == "!": # Para fatorial via teclado
+            # Tenta aplicar fatorial ao último número ou expressão entre parênteses
+            # Isso é uma simplificação, idealmente precisaria de um parser mais robusto
+            if self.expression and self.expression[-1].isdigit():
+                # Encontra o último número
+                i = len(self.expression) - 1
+                while i >= 0 and (self.expression[i].isdigit() or self.expression[i] == '.'):
+                    i -= 1
+                num = self.expression[i+1:]
+                self.expression = self.expression[:i+1] + f"fact({num})"
+            else:
+                self.expression += "fact(" # Se não for número, adiciona a função
+        else:
+            self.expression += str(char)
+        self.update_total_expression(self.expression)
+
+    def update_display(self, text):
+        """Atualiza o visor principal."""
+        self.current_expression_label.config(text=text[:15])
+
+    def update_total_expression(self, text):
+        """Atualiza o visor secundário (expressão completa)."""
+        self.total_expression_label.config(text=f"{text[:40]}  {self.angle_mode}")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = Calculator(root)
+    root.mainloop()
